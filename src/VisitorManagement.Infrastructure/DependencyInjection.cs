@@ -2,8 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VisitorManagement.Application.Abstractions;
+using VisitorManagement.Application.Services;
 using VisitorManagement.Domain.Entities;
 using VisitorManagement.Infrastructure.Persistence;
+using VisitorManagement.Infrastructure.Security;
 
 namespace VisitorManagement.Infrastructure;
 
@@ -19,6 +22,17 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+        services.AddScoped<IPasswordVerifier, PasswordVerifier>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        return services;
+    }
+
+    /// <summary>Registered by the API only. The Azure Function does not issue tokens.</summary>
+    public static IServiceCollection AddJwtTokenServices(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton(JwtOptions.Load(configuration));
+        services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         return services;
     }
 
@@ -30,5 +44,11 @@ public static class DependencyInjection
 
         await db.Database.MigrateAsync();
         await DbSeeder.SeedUsersAsync(db, hasher);
+    }
+
+    public static IServiceCollection AddApplication(this IServiceCollection services)
+    {
+        services.AddScoped<IAuthService, AuthService>();
+        return services;
     }
 }
