@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using VisitorManagement.Api.Authorization;
+using VisitorManagement.Api.ErrorHandling;
 using VisitorManagement.Application.Abstractions;
 using VisitorManagement.Application.DTOs.Auth;
 
@@ -25,10 +26,12 @@ public class AuthController : ControllerBase
 
         if (result is null)
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Authentication failed",
-                detail: "Invalid username or password. Please verify your credentials and try again.");
+            return Unauthorized(ApiErrors.Create(
+                HttpContext,
+                StatusCodes.Status401Unauthorized,
+                "Authentication failed",
+                "Invalid username or password. Please verify your credentials and try again.",
+                "invalid_credentials"));
         }
 
         return Ok(result);

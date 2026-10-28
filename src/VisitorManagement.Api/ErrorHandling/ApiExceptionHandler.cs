@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using VisitorManagement.Api.Middleware;
 using VisitorManagement.Application.Exceptions;
-using System.Text.Json;
 
 namespace VisitorManagement.Api.ErrorHandling;
 
@@ -13,46 +13,52 @@ public class ApiExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
-        ProblemDetails problem = exception switch
+        var operation = ResolveOperation(context);
+
+        if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
         {
-            ValidationFailedException v => new ValidationProblemDetails(v.Errors.ToDictionary(e => e.Key, e => e.Value))
-            {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Validation failed",
-                Detail = "One or more fields are invalid."
-            },
-            NotFoundException => new ProblemDetails
-            {
-                Status = StatusCodes.Status404NotFound,
-                Title = "Not found",
-                Detail = "The requested record was not found."
-            },
-            ConflictException c => new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Conflict",
-                Detail = c.Message
-            },
-            _ => new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "Unexpected error",
-                Detail = "Something went wrong. Please try again later."
-            }
-        };
+            _logger.LogInformation("Operation={Operation} cancelled because the client closed the request", operation);
+            context.Response.StatusCode = 499;
+            return true;
+        }
 
-        if (problem.Status == StatusCodes.Status500InternalServerError)
-            _logger.LogError(exception, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+        var correlationId = context.GetCorrelationId();
+
+        (int Status, string Title, string Detail, string Code, IReadOnlyDictionary<string, string[]>? Errors) error =
+            exception switch
+            {
+                ValidationFailedException v => (400, "Validation failed", "One or more fields are invalid.", "validation_failed", v.Errors),
+                NotFoundException => (404, "Not found", "The requested record was not found.", "not_found", null),
+                ConflictException c => (409, "Conflict", c.Message, "conflict", null),
+                BadHttpRequestException => (400, "Bad request", "The request could not be understood.", "bad_request", null),
+                _ => (500, "Unexpected error",
+                                                $"Unable to complete the request. Please try again. Reference: {correlationId}",
+                                                "unexpected_error", null)
+            };
+
+        if (error.Status >= 500)
+        {
+            // Technical detail goes to the server log only, never to the response.
+            _logger.LogError(exception, "Operation={Operation} failed with an unhandled exception", operation);
+        }
         else
-            _logger.LogWarning("Request rejected with {Status}: {ExceptionType}", problem.Status, exception.GetType().Name);
+        {
+            _logger.LogWarning("Operation={Operation} rejected with {StatusCode} ({ErrorCode})",
+                operation, error.Status, error.Code);
+        }
 
-        context.Response.StatusCode = problem.Status!.Value;
-        await context.Response.WriteAsJsonAsync(
-            problem,
-            problem.GetType(),
-            (JsonSerializerOptions?)null,
-            "application/problem+json",
-            ct);
+        var problem = ApiErrors.Create(
+            context, error.Status, error.Title, error.Detail, error.Code,
+            error.Errors?.ToDictionary(e => e.Key, e => e.Value));
+
+        await ApiErrors.WriteAsync(context, problem, ct);
         return true;
+    }
+
+    private static string ResolveOperation(HttpContext context)
+    {
+        var endpoint = context.Features.Get<IExceptionHandlerPathFeature>()?.Endpoint;
+        var action = endpoint?.Metadata.GetMetadata<ControllerActionDescriptor>();
+        return action is null ? "Unknown" : $"{action.ControllerName}.{action.ActionName}";
     }
 }

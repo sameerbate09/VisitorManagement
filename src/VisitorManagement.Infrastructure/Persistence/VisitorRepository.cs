@@ -4,14 +4,21 @@ using VisitorManagement.Application.DTOs.Visitors;
 using VisitorManagement.Application.Exceptions;
 using VisitorManagement.Domain.Entities;
 using VisitorManagement.Domain.Enums;
+using Microsoft.Extensions.Logging;
+using VisitorManagement.Contracts;
 
 namespace VisitorManagement.Infrastructure.Persistence;
 
 public class VisitorRepository : IVisitorRepository
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<VisitorRepository> _logger;
 
-    public VisitorRepository(AppDbContext db) => _db = db;
+    public VisitorRepository(AppDbContext db, ILogger<VisitorRepository> logger)
+    {
+        _db = db;
+        _logger = logger;
+    }
 
     public async Task<VisitorDto?> GetByIdAsync(int id, CancellationToken ct) =>
         await Project(_db.Visitors.AsNoTracking().Where(v => v.Id == id)).FirstOrDefaultAsync(ct);
@@ -80,6 +87,16 @@ public class VisitorRepository : IVisitorRepository
         {
             throw new ConflictException(
                 "This visitor record was changed by someone else. Reload it and try again.");
+        }
+        catch (DbUpdateException ex)
+        {
+            // Database-origin failures are tagged Source=DB, with the same correlation ID as the request.
+            using (_logger.BeginScope(new Dictionary<string, object>
+            { [CorrelationConstants.SourceProperty] = LogSources.Db }))
+            {
+                _logger.LogError(ex, "Operation={Operation} database write failed", "SaveVisitor");
+            }
+            throw;   // the central handler turns it into a safe 500
         }
     }
 

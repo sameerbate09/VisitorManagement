@@ -1,20 +1,33 @@
-using Microsoft.OpenApi.Models;
-using VisitorManagement.Api.Extensions;
-using VisitorManagement.Application;
-using VisitorManagement.Infrastructure;
 using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
+using Serilog;
 using VisitorManagement.Api.ErrorHandling;
+using VisitorManagement.Api.Extensions;
+using VisitorManagement.Api.Middleware;
 using VisitorManagement.Api.Services;
+using VisitorManagement.Application;
 using VisitorManagement.Application.Abstractions;
+using VisitorManagement.Contracts;
+using VisitorManagement.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Order matters: FromLogContext runs first, so a Source pushed by a scope (for example DB)
+// wins over this default.
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty(CorrelationConstants.SourceProperty, LogSources.Api));
 
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
-builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddScoped<ICorrelationIdAccessor, CorrelationIdAccessor>();
+builder.Services.AddApiErrorHandling();
+builder.Services.AddClientCors(builder.Configuration);
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -46,6 +59,9 @@ builder.Services.AddJwtTokenServices(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseMiddleware<CorrelationIdMiddleware>();   // 1st: every later log line and error has the ID
+app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -56,6 +72,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
