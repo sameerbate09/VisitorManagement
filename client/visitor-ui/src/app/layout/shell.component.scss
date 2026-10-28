@@ -1,0 +1,49 @@
+
+mat-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.title {
+  font-weight: 600;
+  margin-right: 16px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.user {
+  margin-right: 16px;
+  font-size: 14px;
+}
+
+.active {
+  font-weight: 700;
+}
+
+.content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+@media (max-width: 600px) {
+  mat-toolbar {
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .title {
+    font-size: 16px;
+    margin-right: 4px;
+  }
+
+  .user {
+    display: none;
+  }
+
+  .content {
+    padding: 16px 12px;
+  }
+}

@@ -1,0 +1,225 @@
+
+<section class="page">
+  <header class="page-head">
+    <div>
+      <h2>Visitors</h2>
+      <p class="sub">
+        @if (hasLoaded() && !error()) {
+          {{ total() }} {{ total() === 1 ? 'visit' : 'visits' }} found
+        } @else {
+          &nbsp;
+        }
+      </p>
+    </div>
+
+    <div class="head-actions">
+      <!-- "New visitor" button arrives in 7b-2 -->
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <mat-form-field
+      appearance="outline"
+      class="search"
+      subscriptSizing="dynamic"
+    >
+      <mat-icon matPrefix>search</mat-icon>
+      <mat-label>Search visitor, company, host or mobile</mat-label>
+
+      <input
+        matInput
+        [formControl]="searchControl"
+        maxlength="100"
+        autocomplete="off"
+      />
+
+      @if (searchControl.value) {
+        <button
+          matSuffix
+          mat-icon-button
+          type="button"
+          aria-label="Clear search"
+          (click)="clearSearch()"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="reload()"
+      [disabled]="loading()"
+    >
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </div>
+
+  <div class="panel">
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+
+    @if (error(); as err) {
+      <div class="state error" role="alert">
+        <mat-icon class="big">cloud_off</mat-icon>
+        <h3>We could not load the visitors</h3>
+        <p>{{ err.detail }}</p>
+
+        @if (err.correlationId) {
+          <p class="ref">Reference: {{ err.correlationId }}</p>
+        }
+
+        <button mat-flat-button type="button" (click)="reload()">
+          Try again
+        </button>
+      </div>
+    } @else if (!hasLoaded()) {
+      <div class="skeleton" aria-hidden="true">
+        @for (row of skeletonRows; track row) {
+          <div class="skeleton-row">
+            <span class="sk circle"></span>
+            <span class="sk line w30"></span>
+            <span class="sk line w20"></span>
+            <span class="sk line w20"></span>
+            <span class="sk line w10"></span>
+          </div>
+        }
+      </div>
+    } @else if (items().length === 0) {
+      <div class="state">
+        <mat-icon class="big">groups</mat-icon>
+
+        @if (searchControl.value.trim()) {
+          <h3>No visitors match your search</h3>
+          <p>
+            Nothing matched "{{ searchControl.value.trim() }}".
+            Try a different name, company, host or number.
+          </p>
+
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="clearSearch()"
+          >
+            Clear search
+          </button>
+        } @else {
+          <h3>No visitors yet</h3>
+          <p>Visitors you register will appear here.</p>
+        }
+      </div>
+    } @else {
+      <div class="table-wrap" [class.dim]="loading()">
+        <table
+          mat-table
+          [dataSource]="items()"
+          matSort
+          matSortActive="visitDate"
+          matSortDirection="desc"
+          matSortDisableClear
+          (matSortChange)="onSort($event)"
+        >
+          <ng-container matColumnDef="visitorName">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
+              Visitor
+            </th>
+
+            <td mat-cell *matCellDef="let v">
+              <div class="who">
+                <span
+                  class="avatar"
+                  [style.background]="avatarColor(v.visitorName)"
+                >
+                  {{ initials(v.visitorName) }}
+                </span>
+
+                <div>
+                  <div class="name">{{ v.visitorName }}</div>
+                  <div class="muted">{{ v.mobileNumber }}</div>
+                </div>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="companyName">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
+              Company
+            </th>
+            <td mat-cell *matCellDef="let v">
+              {{ v.companyName }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="hostName">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
+              Host
+            </th>
+            <td mat-cell *matCellDef="let v">
+              {{ v.hostName }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="purposeName">
+            <th mat-header-cell *matHeaderCellDef>Purpose</th>
+            <td mat-cell *matCellDef="let v">
+              {{ v.purposeName }}
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="visitDate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
+              Visit
+            </th>
+
+            <td mat-cell *matCellDef="let v">
+              <div class="name">
+                {{ v.visitDate | date: 'dd MMM yyyy' }}
+
+                @if (whenHint(v.visitDate); as hint) {
+                  <span class="hint">{{ hint }}</span>
+                }
+              </div>
+
+              <div class="muted">
+                {{ v.visitDate | date: 'shortTime' }}
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>
+              Status
+            </th>
+
+            <td mat-cell *matCellDef="let v">
+              <span [class]="'chip ' + v.status.toLowerCase()">
+                {{ statusLabel(v.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          <tr
+            mat-row
+            *matRowDef="let row; columns: columns"
+            class="row"
+          ></tr>
+        </table>
+      </div>
+    }
+
+    @if (!error() && hasLoaded() && total() > 0) {
+      <mat-paginator
+        [length]="total()"
+        [pageIndex]="page() - 1"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[5, 10, 25, 50]"
+        showFirstLastButtons
+        (page)="onPage($event)"
+      />
+    }
+  </div>
+</section>

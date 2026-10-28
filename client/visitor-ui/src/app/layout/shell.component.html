@@ -1,0 +1,32 @@
+
+<mat-toolbar>
+  <span class="title">Visitor Management</span>
+
+  <a
+    mat-button
+    routerLink="/visitors"
+    routerLinkActive="active"
+  >
+    Visitors
+  </a>
+
+  <span class="spacer"></span>
+
+  @if (auth.session(); as s) {
+    <span class="user">
+      {{ s.displayName }} · {{ s.role }}
+    </span>
+  }
+
+  <button
+    mat-stroked-button
+    type="button"
+    (click)="auth.signOut()"
+  >
+    Log out
+  </button>
+</mat-toolbar>
+
+<main class="content">
+  <router-outlet />
+</main>

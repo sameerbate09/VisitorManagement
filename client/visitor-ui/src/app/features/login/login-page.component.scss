@@ -1,0 +1,53 @@
+
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.banner {
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.banner.error {
+  background: #fdecea;
+  color: #7f1d1d;
+}
+
+.banner.info {
+  background: #e8f1fd;
+  color: #0b3d91;
+}
+
+button[type='submit'] {
+  height: 44px;
+}
+
+mat-spinner {
+  margin: 0 auto;
+}

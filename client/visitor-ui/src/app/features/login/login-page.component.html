@@ -1,0 +1,66 @@
+
+<div class="wrapper">
+  <mat-card class="card">
+    <mat-card-header>
+      <mat-card-title>Visitor Management</mat-card-title>
+      <mat-card-subtitle>Sign in to continue</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (notice()) {
+        <div class="banner info" role="status">
+          {{ notice() }}
+        </div>
+      }
+
+      @if (errorMessage()) {
+        <div class="banner error" role="alert">
+          {{ errorMessage() }}
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Username</mat-label>
+          <input
+            matInput
+            formControlName="username"
+            autocomplete="username"
+            maxlength="50"
+          />
+
+          @if (form.controls.username.hasError('required')) {
+            <mat-error>Username is required.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+            maxlength="100"
+          />
+
+          @if (form.controls.password.hasError('required')) {
+            <mat-error>Password is required.</mat-error>
+          }
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          type="submit"
+          [disabled]="loading()"
+        >
+          @if (loading()) {
+            <mat-spinner diameter="20"></mat-spinner>
+          } @else {
+            Login
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>
