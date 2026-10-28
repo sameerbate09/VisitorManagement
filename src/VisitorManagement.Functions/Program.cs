@@ -1,20 +1,30 @@
-using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Builder;
-using Microsoft.Azure.Functions.Worker.OpenTelemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using OpenTelemetry;
+using Microsoft.Extensions.Logging;
+using VisitorManagement.Infrastructure;
+using VisitorManagement.Infrastructure.Messaging;
 
-var builder = FunctionsApplication.CreateBuilder(args);
+var host = new HostBuilder()
+    .ConfigureFunctionsWebApplication()
+    .ConfigureServices((context, services) =>
+    {
+        // Config-ready: telemetry flows only when APPLICATIONINSIGHTS_CONNECTION_STRING is set.
+        services.AddApplicationInsightsTelemetryWorkerService();
+        services.ConfigureFunctionsApplicationInsights();
 
-builder.ConfigureFunctionsWebApplication();
+        // Let Information-level logs reach Application Insights (the default filter drops them).
+        services.Configure<LoggerFilterOptions>(options =>
+        {
+            var rule = options.Rules.FirstOrDefault(r =>
+                r.ProviderName == "Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider");
+            if (rule is not null) options.Rules.Remove(rule);
+        });
 
-if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING")))
-{
-    builder.Services.AddOpenTelemetry()
-        .UseFunctionsWorkerDefaults()
-        .UseAzureMonitorExporter();
-}
+        services.AddSingleton(TimeProvider.System);
+        services.AddInfrastructure(context.Configuration);   // DbContext
+        services.AddScoped<VisitorCreatedAuditProcessor>();
+    })
+    .Build();
 
-builder.Build().Run();
+host.Run();

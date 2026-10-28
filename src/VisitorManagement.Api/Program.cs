@@ -9,6 +9,7 @@ using VisitorManagement.Application;
 using VisitorManagement.Application.Abstractions;
 using VisitorManagement.Contracts;
 using VisitorManagement.Infrastructure;
+using Microsoft.ApplicationInsights.Extensibility;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +56,17 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddQueuePublishing(builder.Configuration);
+
+// Application Insights is config-ready: it activates only when a connection string is provided
+// (APPLICATIONINSIGHTS_CONNECTION_STRING env var or ApplicationInsights:ConnectionString).
+var appInsightsConnection = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+                            ?? builder.Configuration["ApplicationInsights:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(appInsightsConnection))
+{
+    builder.Services.AddApplicationInsightsTelemetry(o => o.ConnectionString = appInsightsConnection);
+    builder.Services.AddSingleton<ITelemetryInitializer, CorrelationTelemetryInitializer>();
+}
 builder.Services.AddJwtTokenServices(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 

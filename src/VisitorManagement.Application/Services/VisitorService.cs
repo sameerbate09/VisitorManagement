@@ -4,6 +4,7 @@ using VisitorManagement.Application.Abstractions;
 using VisitorManagement.Application.DTOs.Visitors;
 using VisitorManagement.Application.Exceptions;
 using VisitorManagement.Application.Rules;
+using VisitorManagement.Contracts;
 using VisitorManagement.Domain.Entities;
 using VisitorManagement.Domain.Enums;
 
@@ -17,6 +18,8 @@ public class VisitorService : IVisitorService
     private readonly IVisitorRepository _visitors;
     private readonly IReferenceDataRepository _reference;
     private readonly ICurrentUser _currentUser;
+    private readonly IVisitorEventPublisher _publisher;
+    private readonly ICorrelationIdAccessor _correlation;
     private readonly IValidator<CreateVisitorRequest> _createValidator;
     private readonly IValidator<UpdateVisitorRequest> _updateValidator;
     private readonly TimeProvider _clock;
@@ -26,6 +29,8 @@ public class VisitorService : IVisitorService
         IVisitorRepository visitors,
         IReferenceDataRepository reference,
         ICurrentUser currentUser,
+        IVisitorEventPublisher publisher,
+        ICorrelationIdAccessor correlation,
         IValidator<CreateVisitorRequest> createValidator,
         IValidator<UpdateVisitorRequest> updateValidator,
         TimeProvider clock,
@@ -34,6 +39,8 @@ public class VisitorService : IVisitorService
         _visitors = visitors;
         _reference = reference;
         _currentUser = currentUser;
+        _publisher = publisher;
+        _correlation = correlation;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _clock = clock;
@@ -97,7 +104,7 @@ public class VisitorService : IVisitorService
         _logger.LogInformation("Operation={Operation} succeeded: VisitorId={VisitorId} by user {UserId}",
             "CreateVisitor", visitor.Id, visitor.CreatedByUserId);
 
-        // Step 6 adds the queue publish here, after the successful save.
+        await PublishVisitorCreatedAsync(visitor, ct);
         return await _visitors.GetByIdAsync(visitor.Id, ct)
             ?? throw new InvalidOperationException("Saved visitor could not be reloaded.");
     }
@@ -136,6 +143,30 @@ public class VisitorService : IVisitorService
             "UpdateVisitor", id, visitor.UpdatedByUserId);
 
         return await _visitors.GetByIdAsync(id, ct) ?? throw new NotFoundException("Visitor", id);
+    }
+
+    private async Task PublishVisitorCreatedAsync(Visitor visitor, CancellationToken ct)
+    {
+        var message = new VisitorCreatedMessage(
+            VisitorCreatedMessage.BuildMessageId(visitor.Id),
+            _correlation.CorrelationId,
+            visitor.Id,
+            visitor.HostId,
+            visitor.VisitDate,
+            visitor.CreatedByUserId,
+            _clock.GetUtcNow().UtcDateTime);
+
+        try
+        {
+            await _publisher.PublishVisitorCreatedAsync(message, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The visitor is already saved. Do not fail the request; log it for follow-up.
+            _logger.LogError(ex,
+                "Operation={Operation} visitor {VisitorId} was saved but the event could not be queued",
+                "PublishVisitorCreated", visitor.Id);
+        }
     }
 
     private static void Apply(Visitor visitor, VisitorRequestBase request, string mobile, DateTime visitDateUtc)

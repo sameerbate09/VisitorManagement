@@ -9,6 +9,8 @@ using VisitorManagement.Application.Validators;
 using VisitorManagement.Domain.Entities;
 using VisitorManagement.Infrastructure.Persistence;
 using VisitorManagement.Infrastructure.Security;
+using Azure.Storage.Queues;
+using VisitorManagement.Infrastructure.Messaging;
 
 namespace VisitorManagement.Infrastructure;
 
@@ -57,6 +59,24 @@ public static class DependencyInjection
         services.AddScoped<IVisitorService, VisitorService>();
         services.AddScoped<IReferenceDataService, ReferenceDataService>();
         services.AddValidatorsFromAssemblyContaining<CreateVisitorRequestValidator>();
+        return services;
+    }
+
+    /// <summary>Registered by the API only. The Function consumes the queue, it does not publish.</summary>
+    public static IServiceCollection AddQueuePublishing(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        var options = QueueOptions.Load(configuration);
+
+        services.AddSingleton(_ =>
+        {
+            var clientOptions = new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 };
+            clientOptions.Retry.MaxRetries = 2;                              // fail fast if the queue is unreachable
+            clientOptions.Retry.NetworkTimeout = TimeSpan.FromSeconds(5);
+            return new QueueClient(options.ConnectionString, options.QueueName, clientOptions);
+        });
+        services.AddScoped<IVisitorEventPublisher, QueueVisitorEventPublisher>();
+
         return services;
     }
 }
