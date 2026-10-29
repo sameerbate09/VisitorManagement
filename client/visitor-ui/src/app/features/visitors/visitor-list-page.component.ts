@@ -1,18 +1,21 @@
 
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatMenuModule } from '@angular/material/menu';
 import {
   MatPaginatorModule,
   PageEvent,
 } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   MatSortModule,
   Sort,
@@ -41,6 +44,10 @@ import {
 } from '../../core/models/api.models';
 import { AuthService } from '../../core/services/auth.service';
 import { VisitorApiService } from '../../core/services/visitor-api.service';
+import {
+  VisitorFormDialogComponent,
+  VisitorFormDialogData,
+} from './visitor-form-dialog.component';
 
 interface LoadOutcome {
   result: PagedResult<Visitor> | null;
@@ -59,25 +66,31 @@ interface LoadOutcome {
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
+    MatDialogModule,
     MatIconModule,
     MatProgressBarModule,
+    MatMenuModule,
+    MatSnackBarModule,
   ],
   templateUrl: './visitor-list-page.component.html',
   styleUrl: './visitor-list-page.component.scss',
 })
 export class VisitorListPageComponent {
   private readonly api = inject(VisitorApiService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly auth = inject(AuthService);
 
-  readonly columns = [
+  readonly columns = computed(() => [
     'visitorName',
     'companyName',
     'hostName',
     'purposeName',
     'visitDate',
     'status',
-  ];
+    ...(this.auth.isAdmin() ? ['actions'] : []),
+  ]);
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -171,6 +184,14 @@ export class VisitorListPageComponent {
     this.refresh$.next();
   }
 
+  addVisitor(): void {
+    this.openVisitorForm(null);
+  }
+
+  editVisitor(visitor: Visitor): void {
+    this.openVisitorForm(visitor);
+  }
+
   clearSearch(): void {
     this.searchControl.setValue('');
   }
@@ -236,6 +257,33 @@ export class VisitorListPageComponent {
       : diffDays === 1
         ? 'Tomorrow'
         : '';
+  }
+
+  private openVisitorForm(visitor: Visitor | null): void {
+    if (!this.auth.isAdmin()) return;
+
+    this.dialog
+      .open<
+        VisitorFormDialogComponent,
+        VisitorFormDialogData,
+        Visitor
+      >(VisitorFormDialogComponent, {
+        width: '720px',
+        maxWidth: '95vw',
+        data: { visitor },
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (!saved) return;
+
+        this.snackBar.open(
+          visitor ? 'Visitor updated successfully.' : 'Visitor added successfully.',
+          'Dismiss',
+          { duration: 4000 },
+        );
+        this.page.set(1);
+        this.refresh$.next();
+      });
   }
 
   private currentQuery(): VisitorListQuery {

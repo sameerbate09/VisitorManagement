@@ -1,0 +1,135 @@
+<h2 mat-dialog-title>{{ isEdit ? 'Edit visitor' : 'Register a visitor' }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content>
+    @if (banner(); as message) {
+      <div class="banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <div>
+          <div>{{ message }}</div>
+          @if (conflict() && isEdit) {
+            <button type="button" mat-button class="link" (click)="reloadLatest()" [disabled]="saving()">
+              Load the latest version
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Visitor name</mat-label>
+        <input matInput formControlName="visitorName" maxlength="100" autocomplete="off" />
+        <mat-error>{{ err('visitorName') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Company</mat-label>
+        <input matInput formControlName="companyName" maxlength="150" autocomplete="off" />
+        <mat-error>{{ err('companyName') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Mobile number</mat-label>
+        <input
+          matInput
+          type="tel"
+          inputmode="numeric"
+          formControlName="mobileNumber"
+          maxlength="10"
+          autocomplete="off"
+        />
+        <mat-hint>Enter exactly 10 digits</mat-hint>
+        <mat-error>{{ err('mobileNumber') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Email (optional)</mat-label>
+        <input matInput type="email" formControlName="email" maxlength="254" autocomplete="off" />
+        <mat-error>{{ err('email') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Host (person being visited)</mat-label>
+        <mat-icon matPrefix>person_search</mat-icon>
+        <input matInput formControlName="host" [matAutocomplete]="hostAuto" autocomplete="off" />
+        <mat-autocomplete #hostAuto="matAutocomplete" [displayWith]="displayHost">
+          @for (h of hosts(); track h.id) {
+            <mat-option [value]="h">
+              {{ h.fullName }} <span class="dept">· {{ h.department }}</span>
+            </mat-option>
+          }
+          @if (!hostsLoading() && hosts().length === 0) {
+            <mat-option disabled>No matching hosts</mat-option>
+          }
+        </mat-autocomplete>
+        @if (hostsLoading()) {
+          <mat-spinner matSuffix diameter="18"></mat-spinner>
+        }
+        <mat-hint>Type to search, then pick from the list</mat-hint>
+        <mat-error>{{ err('host') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Purpose of visit</mat-label>
+        <mat-select formControlName="purposeId">
+          @for (p of purposes(); track p.id) {
+            <mat-option [value]="p.id">{{ p.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-error>{{ err('purposeId') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Visit date</mat-label>
+        <input
+          matInput
+          [matDatepicker]="picker"
+          formControlName="visitDate"
+          [min]="minDate"
+          [max]="maxDate"
+          (click)="picker.open()"
+          readonly
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+        <mat-error>{{ err('visitDate') }}</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Visit time</mat-label>
+        <input matInput type="time" formControlName="visitTime" />
+        <mat-error>{{ err('visitTime') }}</mat-error>
+      </mat-form-field>
+
+      @if (isEdit) {
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Status</mat-label>
+          <mat-select formControlName="status">
+            @for (s of statuses; track s.value) {
+              <mat-option [value]="s.value">{{ s.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Remarks (optional)</mat-label>
+        <textarea matInput rows="3" formControlName="remarks" maxlength="500"></textarea>
+        <mat-hint align="end">{{ form.controls.remarks.value.length }} / 500</mat-hint>
+        <mat-error>{{ err('remarks') }}</mat-error>
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="close()" [disabled]="saving()">Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="saving()">
+      @if (saving()) {
+        <mat-spinner diameter="20"></mat-spinner>
+      } @else {
+        {{ isEdit ? 'Save changes' : 'Register visitor' }}
+      }
+    </button>
+  </mat-dialog-actions>
+</form>

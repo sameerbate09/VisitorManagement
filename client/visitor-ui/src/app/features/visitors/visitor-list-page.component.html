@@ -13,7 +13,16 @@
     </div>
 
     <div class="head-actions">
-      <!-- "New visitor" button arrives in 7b-2 -->
+      @if (auth.isAdmin()) {
+        <button
+          mat-flat-button
+          type="button"
+          (click)="addVisitor()"
+        >
+          <mat-icon>add</mat-icon>
+          New visitor
+        </button>
+      }
     </div>
   </header>
 
@@ -201,10 +210,32 @@
             </td>
           </ng-container>
 
-          <tr mat-header-row *matHeaderRowDef="columns"></tr>
+          @if (auth.isAdmin()) {
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Actions</th>
+              <td mat-cell *matCellDef="let v">
+                <button
+                  mat-icon-button
+                  type="button"
+                  [matMenuTriggerFor]="visitorMenu"
+                  [attr.aria-label]="'Actions for ' + v.visitorName"
+                >
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #visitorMenu="matMenu">
+                  <button mat-menu-item type="button" (click)="editVisitor(v)">
+                    <mat-icon>edit</mat-icon>
+                    <span>Edit visitor</span>
+                  </button>
+                </mat-menu>
+              </td>
+            </ng-container>
+          }
+
+          <tr mat-header-row *matHeaderRowDef="columns()"></tr>
           <tr
             mat-row
-            *matRowDef="let row; columns: columns"
+            *matRowDef="let row; columns: columns()"
             class="row"
           ></tr>
         </table>
